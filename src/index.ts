@@ -67,6 +67,7 @@ export class TypedEventTarget<
   constructor (
     public readonly map: Map<EventName<TRecord>, ListenerArray> = new Map(),
     public readonly anyListeners: ListenerArray<AnyEvent<TRecord>> = [],
+    private readonly callbacks = new Map<string, TypedEventListener<any>>()
   ) {}
 
   static default<TRecord extends EventPayloadMap>(): TypedEventTarget<TRecord> {
@@ -219,9 +220,30 @@ export class TypedEventTarget<
     return (this.map.get(type)?.length ?? 0) > 0 || this.anyListeners.length > 0
   }
 
+  setCallback<TType extends EventName<TRecord>>(
+    type: TType,
+    listener: TypedEventListener<EventFor<TRecord, TType>> | null,
+  ): void {
+    const prev = this.callbacks.get(type as string)
+    if (prev) this.removeEventListener(type, prev)
+    if (listener) {
+      this.callbacks.set(type as string, listener)
+      this.addEventListener(type, listener)
+    } else {
+      this.callbacks.delete(type as string)
+    }
+  }
+
+  getCallback<TType extends EventName<TRecord>>(
+    type: TType,
+  ): TypedEventListener<EventFor<TRecord, TType>> | null {
+    return (this.callbacks.get(type as string) as TypedEventListener<EventFor<TRecord, TType>>) ?? null
+  }
+
   dispose(): void {
     this.map.clear()
     this.anyListeners.length = 0
+    this.callbacks.clear()
   }
 }
 

@@ -185,3 +185,75 @@ test("exports user-facing constructors and aliases", () => {
 
   expect(seen).toBe(true)
 })
+
+test("setCallback registers a single callback for an event type", () => {
+  const target = TypedEventTarget.from<{
+    click: { x: number; y: number }
+  }>()
+
+  const received: Array<{ x: number; y: number }> = []
+
+  target.setCallback("click", (event) => {
+    received.push({ x: event.x, y: event.y })
+  })
+
+  target.dispatch("click", { x: 1, y: 2 })
+
+  expect(received).toEqual([{ x: 1, y: 2 }])
+})
+
+test("setCallback replaces previous callback for the same event type", () => {
+  const target = TypedEventTarget.from<{
+    click: { x: number; y: number }
+  }>()
+
+  let firstCount = 0
+  let secondCount = 0
+
+  target.setCallback("click", () => { firstCount++ })
+  target.setCallback("click", () => { secondCount++ })
+
+  target.dispatch("click", { x: 0, y: 0 })
+
+  expect(firstCount).toBe(0)
+  expect(secondCount).toBe(1)
+})
+
+test("setCallback with null removes the callback", () => {
+  const target = TypedEventTarget.from<{
+    click: { x: number; y: number }
+  }>()
+
+  let count = 0
+  target.setCallback("click", () => { count++ })
+  target.setCallback("click", null)
+
+  target.dispatch("click", { x: 0, y: 0 })
+
+  expect(count).toBe(0)
+  expect(target.getCallback("click")).toBeNull()
+})
+
+test("getCallback returns the current callback or null", () => {
+  const target = TypedEventTarget.from<{
+    click: { x: number; y: number }
+  }>()
+
+  expect(target.getCallback("click")).toBeNull()
+
+  const listener = () => {}
+  target.setCallback("click", listener)
+
+  expect(target.getCallback("click")).toBe(listener)
+})
+
+test("dispose clears callbacks", () => {
+  const target = TypedEventTarget.from<{
+    click: { x: number; y: number }
+  }>()
+
+  target.setCallback("click", () => {})
+  target.dispose()
+
+  expect(target.getCallback("click")).toBeNull()
+})
