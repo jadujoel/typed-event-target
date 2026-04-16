@@ -1,8 +1,23 @@
 {
   "name": "@jadujoel/typed-event-target",
   "version": "0.0.1",
-  "module": "src/index.ts",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "bunx tsc -p",
+    "test": "bun test"
+  },
+  "sideEffects": false,
   "devDependencies": {
     "@types/bun": "latest",
     "@types/web": "0.0.345",
@@ -11,5 +26,11 @@
   "peerDependencies": {
     "typescript": "^6"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "files": [
+    "README.md",
+    "src",
+    "dist",
+    "example.ts"
+  ]
 }

@@ -68,6 +68,10 @@ export class TypedEventTarget<
     return new TypedEventTarget<TRecord>()
   }
 
+  static fromRecord<TRecord extends EventPayloadMap>(): TypedEventTarget<TRecord> {
+    return new TypedEventTarget<TRecord>()
+  }
+
   addEventListener<TType extends EventName<TRecord>>(
     type: TType,
     listener:
