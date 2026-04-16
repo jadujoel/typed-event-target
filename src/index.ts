@@ -44,6 +44,14 @@ export type EventFor<
   TType extends EventName<TRecord>,
 > = TypedEvent<TType, TRecord[TType]>
 
+export type AnyEvent<TRecord extends EventPayloadMap> = {
+  [TType in EventName<TRecord>]: EventFor<TRecord, TType>
+}[EventName<TRecord>]
+
+export type AnyEventListener<TRecord extends EventPayloadMap> =
+  | TypedEventListener<AnyEvent<TRecord>>
+  | TypedEventListenerObject<AnyEvent<TRecord>>
+
 export type DispatchableEvent<
   TType extends string = string,
   TPayload extends PayloadType = PayloadType,
@@ -57,7 +65,8 @@ export class TypedEventTarget<
 > {
 
   constructor (
-    public readonly map: Map<EventName<TRecord>, ListenerArray> = new Map()
+    public readonly map: Map<EventName<TRecord>, ListenerArray> = new Map(),
+    public readonly anyListeners: ListenerArray<AnyEvent<TRecord>> = [],
   ) {}
 
   static default<TRecord extends EventPayloadMap>(): TypedEventTarget<TRecord> {
@@ -90,6 +99,18 @@ export class TypedEventTarget<
     this.map.set(type, listeners)
   }
 
+  addAnyEventListener(
+    listener: AnyEventListener<TRecord> | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void {
+    if (listener === null) {
+      return
+    }
+
+    const once = typeof options === "boolean" ? false : options?.once ?? false
+    this.anyListeners.push([listener, once])
+  }
+
   removeEventListener<TType extends EventName<TRecord>>(
     type: TType,
     listener:
@@ -120,17 +141,35 @@ export class TypedEventTarget<
     }
   }
 
+  removeAnyEventListener(
+    listener: AnyEventListener<TRecord> | null,
+    _options?: boolean | EventListenerOptions,
+  ): void {
+    if (listener === null) {
+      return
+    }
+
+    for (let index = 0; index < this.anyListeners.length; index++) {
+      const [candidate] = this.anyListeners[index]!
+      if (candidate === listener) {
+        this.anyListeners.splice(index, 1)
+        break
+      }
+    }
+  }
+
   dispatchEvent<TType extends EventName<TRecord>>(
     event: DispatchableEvent<TType, TRecord[TType]>,
   ): boolean {
     const type = event.type
-    const listeners = this.map.get(type)
+    const listeners = this.map.get(type) ?? []
 
-    if (listeners === undefined || listeners.length === 0) {
+    if (listeners.length === 0 && this.anyListeners.length === 0) {
       return true
     }
 
     const typedEvent = event as EventFor<TRecord, TType>
+    const anyEvent = event as AnyEvent<TRecord>
 
     for (const [listener, once] of [...listeners]) {
       if (typeof listener === "function") {
@@ -141,6 +180,18 @@ export class TypedEventTarget<
 
       if (once) {
         this.removeEventListener(type, listener)
+      }
+    }
+
+    for (const [listener, once] of [...this.anyListeners]) {
+      if (typeof listener === "function") {
+        listener(anyEvent)
+      } else {
+        listener.handleEvent(anyEvent)
+      }
+
+      if (once) {
+        this.removeAnyEventListener(listener)
       }
     }
 
@@ -165,11 +216,12 @@ export class TypedEventTarget<
   }
 
   hasListeners<TType extends EventName<TRecord>>(type: TType): boolean {
-    return (this.map.get(type)?.length ?? 0) > 0
+    return (this.map.get(type)?.length ?? 0) > 0 || this.anyListeners.length > 0
   }
 
   dispose(): void {
     this.map.clear()
+    this.anyListeners.length = 0
   }
 }
 

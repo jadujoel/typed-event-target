@@ -73,6 +73,19 @@ The listener receives data shaped like this:
 { type: "ready", startedAt: 1710000000000 }
 ```
 
+## Listening to every event
+
+```ts
+const target = TypedEventTarget.from<{
+  ready: { startedAt: number }
+  message: { text: string }
+}>()
+
+target.addAnyEventListener((event) => {
+  console.log(event.type)
+})
+```
+
 ## Once listeners
 
 ```ts
@@ -158,7 +171,9 @@ sameButton.addEventListener("click", (event) => {
 ### Instance methods
 
 - `addEventListener(type, listener, options?)`
+- `addAnyEventListener(listener, options?)`
 - `removeEventListener(type, listener)`
+- `removeAnyEventListener(listener)`
 - `dispatch(type, payload)`
 - `emit(event)` or `emit(type, payload)`
 - `dispatchEvent(event)`

@@ -7,6 +7,10 @@ const target = TypedEventTarget.from<{
   clock: { time: Date },
 }>()
 
+target.addAnyEventListener(({ type, ...extra }) => {
+  console.log(`Received event of type ${type}`, extra)
+})
+
 target.emit({
   type: "click",
   x: 10,

@@ -74,6 +74,48 @@ test("supports once listeners", () => {
   expect(count).toBe(1)
 })
 
+test("listens to every event with addAnyEventListener", () => {
+  const target = TypedEventTarget.from<{
+    ready: { ok: boolean }
+    saved: { id: string }
+  }>()
+
+  const seen: string[] = []
+
+  target.addAnyEventListener((event) => {
+    if (event.type === "ready") {
+      seen.push(`ready:${String(event.ok)}`)
+      return
+    }
+
+    seen.push(`saved:${event.id}`)
+  })
+
+  expect(target.hasListeners("ready")).toBe(true)
+
+  target.dispatch("ready", { ok: true })
+  target.dispatch("saved", { id: "42" })
+
+  expect(seen).toEqual(["ready:true", "saved:42"])
+})
+
+test("removes any-event listeners cleanly", () => {
+  const target = TypedEventTarget.from<{
+    change: { value: number }
+  }>()
+
+  let count = 0
+  const listener = () => {
+    count += 1
+  }
+
+  target.addAnyEventListener(listener)
+  target.removeAnyEventListener(listener)
+  target.dispatch("change", { value: 1 })
+
+  expect(count).toBe(0)
+})
+
 test("supports fromRecord in an end-to-end flow", () => {
   const target = TypedEventTarget.fromRecord<{
     saved: { id: string; ok: boolean }
