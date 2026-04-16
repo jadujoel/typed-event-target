@@ -1,14 +1,14 @@
 {
   "name": "@jadujoel/typed-event-target",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "repository": {
-		"type": "git",
-		"url": "git+https://github.com/jadujoel/typed-event-target.git"
-	},
+    "type": "git",
+    "url": "git+https://github.com/jadujoel/typed-event-target.git"
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/",
