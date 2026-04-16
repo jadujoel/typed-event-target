@@ -1,89 +1,160 @@
 /// <reference types="@types/web" />
 
-export interface TypedEvent<TType extends string = string, TDetails = unknown> {
+export interface TypedEvent<TType extends string = string, TDetail = unknown> {
   readonly type: TType
-  readonly details?: TDetails
+  readonly detail: TDetail
+  readonly details?: TDetail
 }
 
-interface ExampleRecord {
-  click: {
-    x: number
-    y: number
-  }
-  keydown: {
-    key: string
-  }
+export type TypedEventRecord<
+  TType extends string = string,
+  TDetails = unknown,
+> = {
+  [K in TType]: TDetails
 }
 
-export interface TypedEventRecord<TType extends string = string, TDetails = unknown> {
-  [K in TType]: TypedEvent<K, TDetails>
-}
-
-export type TypedEventListener <
-  TTypedEvent extends TypedEvent = TypedEvent
+export type TypedEventListener<
+  TTypedEvent extends TypedEvent = TypedEvent,
 > = (event: TTypedEvent) => void
 
+type TypedEventListenerObject<
+  TTypedEvent extends TypedEvent = TypedEvent,
+> = {
+  readonly handleEvent: (event: TTypedEvent) => void
+}
+
+type ListenerEntry<TTypedEvent extends TypedEvent = TypedEvent> = readonly [
+  TypedEventListener<TTypedEvent> | TypedEventListenerObject<TTypedEvent>,
+  boolean,
+]
+
 export type ListenerArray<
-  TTypedEventListener extends TypedEventListener = TypedEventListener
-> = Array<ReadonlyArray<[TTypedEventListener, boolean]>>
+  TTypedEvent extends TypedEvent = TypedEvent,
+> = Array<ListenerEntry<TTypedEvent>>
 
 export type ListenerMap<
   TListenerName extends string = string,
-  TListenerArray extends ListenerArray = ListenerArray
-  > = Map<TListenerName, TListenerArray>
+  TListeners extends ListenerArray = ListenerArray,
+> = Map<TListenerName, TListeners>
+
+type EventDetailsMap = Record<string, unknown>
+type EventName<TRecord extends EventDetailsMap> = Extract<keyof TRecord, string>
+type EventFor<
+  TRecord extends EventDetailsMap,
+  TType extends EventName<TRecord>,
+> = TypedEvent<TType, TRecord[TType]>
+
+type DispatchableEvent<TType extends string = string, TDetail = unknown> = {
+  readonly type: TType
+  readonly detail?: TDetail
+  readonly details?: TDetail
+}
+
+function normalizeTypedEvent(event: DispatchableEvent<string, unknown>) {
+  const detail = "detail" in event
+    ? event.detail
+    : "details" in event
+      ? event.details
+      : undefined
+
+  return {
+    ...(event as object),
+    type: event.type,
+    detail,
+    details: detail,
+  } as TypedEvent<string, unknown>
+}
 
 export class TypedEventTarget<
-TListenerMap extends ListenerMap = ListenerMap,
-> implements EventTarget {
+  TRecord extends EventDetailsMap = Record<string, unknown>,
+> {
+  public readonly map: Map<EventName<TRecord>, ListenerArray> = new Map()
 
-  private constructor(
-    public readonly map: TListenerMap = new Map() as TListenerMap
-  ) {}
-
-  addEventListener (
-    type: string,
-    listener: TypedEventListener,
-    options?: { readonly once: boolean }
-  ): void {
-    const listeners = this.map
-    const found = listeners.get(type)
-    const once = options?.once ?? false
-    if (found === undefined) {
-      listeners.set(type, [[listener, once]])
-    } else {
-      found.push([listener, once])
-    }
+  static fromRecord<TRecord extends EventDetailsMap>(): TypedEventTarget<TRecord> {
+    return new TypedEventTarget<TRecord>()
   }
 
-  removeEventListener(type: string, listener: TypedEventListener): void {
+  addEventListener<TType extends EventName<TRecord>>(
+    type: TType,
+    listener:
+      | TypedEventListener<EventFor<TRecord, TType>>
+      | TypedEventListenerObject<EventFor<TRecord, TType>>
+      | null,
+    options?: boolean | AddEventListenerOptions,
+  ): void {
+    if (listener === null) {
+      return
+    }
+
+    const once = typeof options === "boolean" ? false : options?.once ?? false
+    const listeners = this.map.get(type) ?? []
+    listeners.push([listener as TypedEventListener | TypedEventListenerObject, once])
+    this.map.set(type, listeners)
+  }
+
+  removeEventListener<TType extends EventName<TRecord>>(
+    type: TType,
+    listener:
+      | TypedEventListener<EventFor<TRecord, TType>>
+      | TypedEventListenerObject<EventFor<TRecord, TType>>
+      | null,
+    _options?: boolean | EventListenerOptions,
+  ): void {
+    if (listener === null) {
+      return
+    }
+
     const listeners = this.map.get(type)
     if (listeners === undefined) {
       return
     }
-    for (let i = 0; i < listeners.length; i++) {
-      const callback = listeners[i]![0]!
-      if (callback === listener) {
-        listeners.splice(i, 1)
-        return
+
+    for (let index = 0; index < listeners.length; index++) {
+      const [candidate] = listeners[index]!
+      if (candidate === listener) {
+        listeners.splice(index, 1)
+        break
       }
+    }
+
+    if (listeners.length === 0) {
+      this.map.delete(type)
     }
   }
 
-  dispatchEvent(event: TypedEvent): boolean {
+  dispatchEvent<TType extends EventName<TRecord>>(
+    event: DispatchableEvent<TType, TRecord[TType]>,
+  ): boolean {
     const type = event.type
-    const found = this.map.get(type)
-    if (found === undefined) {
+    const listeners = this.map.get(type)
+
+    if (listeners === undefined || listeners.length === 0) {
       return true
     }
-    for (let i = 0; i < found.length; i++) {
-      const [callback, once] = found[i]!
-      callback(event)
+
+    const normalizedEvent = normalizeTypedEvent(event) as EventFor<TRecord, TType>
+
+    for (const [listener, once] of [...listeners]) {
+      if (typeof listener === "function") {
+        listener(normalizedEvent)
+      } else {
+        listener.handleEvent(normalizedEvent)
+      }
+
       if (once) {
-        this.removeEventListener(type, callback)
-        i--
+        this.removeEventListener(type, listener)
       }
     }
+
     return true
+  }
+
+  dispatch<TType extends EventName<TRecord>>(type: TType, detail: TRecord[TType]): boolean {
+    return this.dispatchEvent({ type, detail, details: detail })
+  }
+
+  hasListeners<TType extends EventName<TRecord>>(type: TType): boolean {
+    return (this.map.get(type)?.length ?? 0) > 0
   }
 
   dispose(): void {
@@ -91,167 +162,51 @@ TListenerMap extends ListenerMap = ListenerMap,
   }
 }
 
-// The T stands for "Typed" to distinguish it from the native EventTarget / CustomEvent etc.
-
-/**
- * A type representing a detail for the custom event.
- * @typeParam Key - The keys for the detail type, can be string, number, or symbol.
- * @typeParam Value - The value of the detail, default is any.
- */
 export type DetailType<
   Key extends string | number | symbol = string,
-  Value = any
+  Value = unknown,
 > = Readonly<Record<Key, Value>>
 
-/**
- * A type representing the names for the custom event, default is string.
- */
 export type NamesType = string
 
-/**
- * A type representing a listener for the custom event.
- * @typeParam Names - The names for the custom event.
- * @typeParam Details - The detail type for the custom event.
- */
-type TEventListener<Names extends NamesType, Details extends DetailType> = (
-  event: TCustomEvent<Names, Details>
+type TEventListener<Names extends NamesType, Detail extends DetailType> = (
+  event: TCustomEvent<Names, Detail>,
 ) => void
 
-/**
- * An interface representing an event listener object.
- * @typeParam Names - The names for the custom event.
- * @typeParam Details - The detail type for the custom event.
- */
 interface TEventListenerObject<
   Names extends NamesType,
-  Details extends DetailType
+  Detail extends DetailType,
 > {
-  /**
-   * Method that handles custom events.
-   * @param object - A custom event of type TCustomEvent.
-   * @example
-   * const listenerObject: TEventListenerObject<string, DetailType> = {
-   *   handleEvent: (object) => {
-   *     console.log(`Event of type ${object.type} handled.`);
-   *   }
-   * }
-   * listenerObject.handleEvent(new TCustomEvent("eventType", {detail: "Some detail"}));
-   */
-  readonly handleEvent: (object: TCustomEvent<Names, Details>) => void
+  readonly handleEvent: (object: TCustomEvent<Names, Detail>) => void
 }
 
 export interface TCustomEvent<
   Names extends NamesType,
-  Detail extends DetailType
-> {
-  readonly type: Names[number]
-  readonly detail: Detail
-}
+  Detail extends DetailType,
+> extends TypedEvent<Names, Detail> {}
 
 type TEventListenerOrTEventListenerObject<
   Names extends NamesType,
-  Detail extends DetailType
+  Detail extends DetailType,
 > = TEventListener<Names, Detail> | TEventListenerObject<Names, Detail>
 
-/**
- * An interface representing a targetable event, used for subscribing and unsubscribing to events.
- * @typeParam Names - The names for the custom event.
- * @typeParam Detail - The detail type for the custom event.
- */
 export interface EventTargetable<
   Names extends NamesType = never,
-  Detail extends DetailType = Record<never, never>
+  Detail extends DetailType = Record<never, never>,
 > {
   readonly target: TEventTarget<Names, Detail>
 }
 
-/**
- * Exactly like EventTarget but specifies what event names are available and what detail can be provided, implements EventTarget
- * @typeParam Names - The names for the custom event.
- * @typeParam Detail - The detail type for the custom event.
- */
 export interface TEventTarget<
   Names extends NamesType,
-  Detail extends DetailType = Record<never, never>
-> {
-  /**
-   * Adds an event listener to the target.
-   *
-   * @param type - The type of the event.
-   * @param listener - The listener function or object that responds to the event.
-   * @param options - An options object that specifies characteristics about the event listener.
-   *
-   * @example
-   *
-   * const target: TEventTarget<string, DetailType> = new TEventTarget();
-   *
-   * target.addEventListener("eventType", (event) => {
-   *   console.log(`Event of type ${event.type} handled.`);
-   * }, false);
-   */
-  readonly addEventListener: (
-    type: Names,
-    listener: TEventListenerOrTEventListenerObject<Names, Detail> | null,
-    options?: boolean | AddEventListenerOptions
-  ) => void
-  /**
-   * Dispatches an event at the event target.
-   * @param event - A custom event of type TCustomEvent.
-   * @returns - A boolean that indicates whether the event was cancelled.
-   * @example
-   * const target: TEventTarget<string, DetailType> = new TEventTarget();
-   * const eventDispatched = target.dispatchEvent(new TCustomEvent("eventType", {detail: "Some detail"}));
-   * console.log(`Event was ${eventDispatched ? "not cancelled" : "cancelled"}`);
-   */
-  readonly dispatchEvent: (event: TCustomEvent<Names, Detail>) => boolean
-  /**
-   * Removes an event listener from the target.
-   * @param type - The type of the event.
-   * @param listener - The listener function or object that was added to the target.
-   * @param options - An options object that specifies characteristics about the event listener.
-   *
-   * @example
-   * const target: TEventTarget<string, DetailType> = new TEventTarget();
-   * const listener = (event) => {
-   *   console.log(`Event of type ${event.type} handled.`);
-   * };
-   *
-   * target.addEventListener("eventType", listener, false);
-   * target.removeEventListener("eventType", listener, false);
-   */
-  readonly removeEventListener: (
-    type: Names,
-    listener: TEventListenerOrTEventListenerObject<Names, Detail> | null,
-    options?: boolean | EventListenerOptions
-  ) => void
-}
+  Detail extends DetailType = Record<never, never>,
+> extends TypedEventTarget<Record<Names, Detail>> {}
 
-/**
- * A class representing a custom Typed EventTarget, extends EventTarget.
- * Adds small conveniences like dispatching an event by name and detail instead of creating a new CustomEvent manually
- * @typeParam Names - The names for the custom event.
- * @typeParam Detail - The detail type for the custom event.
- **/
-export class TEventTarget<Names extends NamesType, Detail extends DetailType>
-  extends TypedEventTarget
-  implements TEventTarget<Names, Detail>
-{
-  /**
-   * Dispatches a custom event at the current time.
-   *
-   * @param type - The type of the event.
-   * @param detail - The detail of the event.
-   * @returns - The return value is a boolean that is "true" if the event was successfully dispatched.
-   * @example
-   * const target: TEventTarget<string, DetailType> = new TEventTarget();
-   * const eventDispatched = target.dispatch("eventType", {detail: "Some detail"});
-   * console.log(`Event was ${eventDispatched ? "not cancelled" : "cancelled"}`);
-   */
-  dispatch(type: Names, detail: Detail): boolean {
-    // no need to dispatch if there are no listeners
-    if (this.map.get(type) === undefined) {
-      return true
-    }
-    return this.dispatchEvent({ type, detail })
+export class TEventTarget<
+  Names extends NamesType,
+  Detail extends DetailType = Record<never, never>,
+> extends TypedEventTarget<Record<Names, Detail>> {
+  override dispatch(type: Names, detail: Detail): boolean {
+    return super.dispatch(type as Extract<Names, string>, detail)
   }
 }
