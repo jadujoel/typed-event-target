@@ -25,10 +25,10 @@ jobs:
       - name: Test
         run: bun run test
 
-      # - uses: actions/setup-node@v6
-      #   with:
-      #     node-version: lts/*
-      #     registry-url: https://registry.npmjs.org
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          registry-url: https://registry.npmjs.org
 
       - name: Publish
-        run: bun publish
+        run: npm publish
