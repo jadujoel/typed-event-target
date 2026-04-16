@@ -76,7 +76,7 @@ The listener receives data shaped like this:
 ## Once listeners
 
 ```ts
-const target = TypedEventTarget.fromRecord<{
+const target = TypedEventTarget.from<{
   connected: { userId: string }
 }>()
 
@@ -154,7 +154,6 @@ sameButton.addEventListener("click", (event) => {
 - `new TypedEventTarget()`
 - `TypedEventTarget.default<TRecord>()`
 - `TypedEventTarget.from<TRecord>()`
-- `TypedEventTarget.fromRecord<TRecord>()`
 
 ### Instance methods
 
