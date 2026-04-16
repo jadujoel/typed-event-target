@@ -4,11 +4,11 @@
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/web": "0.0.345"
+    "@types/web": "0.0.345",
+    "happy-dom": "20.9.0"
   },
   "peerDependencies": {
     "typescript": "^6"
   },
-  "dependencies": {
-  }
+  "dependencies": {}
 }

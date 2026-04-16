@@ -1,16 +1,22 @@
 /// <reference types="@types/web" />
 
-export interface TypedEvent<TType extends string = string, TDetail = unknown> {
-  readonly type: TType
-  readonly detail: TDetail
-  readonly details?: TDetail
-}
+export type PayloadType<
+  Key extends PropertyKey = string,
+  Value = unknown,
+> = Readonly<Record<Key, Value>>
+
+export type TypedEvent<
+  TType extends string = string,
+  TPayload extends PayloadType = PayloadType,
+> = Readonly<{
+  type: TType
+} & TPayload>
 
 export type TypedEventRecord<
   TType extends string = string,
-  TDetails = unknown,
+  TPayload extends PayloadType = PayloadType,
 > = {
-  [K in TType]: TDetails
+  [K in TType]: TPayload
 }
 
 export type TypedEventListener<
@@ -37,40 +43,24 @@ export type ListenerMap<
   TListeners extends ListenerArray = ListenerArray,
 > = Map<TListenerName, TListeners>
 
-type EventDetailsMap = Record<string, unknown>
-type EventName<TRecord extends EventDetailsMap> = Extract<keyof TRecord, string>
+type EventPayloadMap = Record<string, PayloadType>
+type EventName<TRecord extends EventPayloadMap> = Extract<keyof TRecord, string>
 type EventFor<
-  TRecord extends EventDetailsMap,
+  TRecord extends EventPayloadMap,
   TType extends EventName<TRecord>,
 > = TypedEvent<TType, TRecord[TType]>
 
-type DispatchableEvent<TType extends string = string, TDetail = unknown> = {
-  readonly type: TType
-  readonly detail?: TDetail
-  readonly details?: TDetail
-}
-
-function normalizeTypedEvent(event: DispatchableEvent<string, unknown>) {
-  const detail = "detail" in event
-    ? event.detail
-    : "details" in event
-      ? event.details
-      : undefined
-
-  return {
-    ...(event as object),
-    type: event.type,
-    detail,
-    details: detail,
-  } as TypedEvent<string, unknown>
-}
+type DispatchableEvent<
+  TType extends string = string,
+  TPayload extends PayloadType = PayloadType,
+> = TypedEvent<TType, TPayload>
 
 export class TypedEventTarget<
-  TRecord extends EventDetailsMap = Record<string, unknown>,
+  TRecord extends EventPayloadMap = Record<string, PayloadType>,
 > {
   public readonly map: Map<EventName<TRecord>, ListenerArray> = new Map()
 
-  static fromRecord<TRecord extends EventDetailsMap>(): TypedEventTarget<TRecord> {
+  static fromRecord<TRecord extends EventPayloadMap>(): TypedEventTarget<TRecord> {
     return new TypedEventTarget<TRecord>()
   }
 
@@ -132,13 +122,13 @@ export class TypedEventTarget<
       return true
     }
 
-    const normalizedEvent = normalizeTypedEvent(event) as EventFor<TRecord, TType>
+    const typedEvent = event as EventFor<TRecord, TType>
 
     for (const [listener, once] of [...listeners]) {
       if (typeof listener === "function") {
-        listener(normalizedEvent)
+        listener(typedEvent)
       } else {
-        listener.handleEvent(normalizedEvent)
+        listener.handleEvent(typedEvent)
       }
 
       if (once) {
@@ -149,8 +139,8 @@ export class TypedEventTarget<
     return true
   }
 
-  dispatch<TType extends EventName<TRecord>>(type: TType, detail: TRecord[TType]): boolean {
-    return this.dispatchEvent({ type, detail, details: detail })
+  dispatch<TType extends EventName<TRecord>>(type: TType, payload: TRecord[TType]): boolean {
+    return this.dispatchEvent({ type, ...payload })
   }
 
   hasListeners<TType extends EventName<TRecord>>(type: TType): boolean {
@@ -162,51 +152,73 @@ export class TypedEventTarget<
   }
 }
 
-export type DetailType<
-  Key extends string | number | symbol = string,
-  Value = unknown,
-> = Readonly<Record<Key, Value>>
-
 export type NamesType = string
 
-type TEventListener<Names extends NamesType, Detail extends DetailType> = (
-  event: TCustomEvent<Names, Detail>,
+type TEventListener<Names extends NamesType, Payload extends PayloadType> = (
+  event: TCustomEvent<Names, Payload>,
 ) => void
 
 interface TEventListenerObject<
   Names extends NamesType,
-  Detail extends DetailType,
+  Payload extends PayloadType,
 > {
-  readonly handleEvent: (object: TCustomEvent<Names, Detail>) => void
+  readonly handleEvent: (object: TCustomEvent<Names, Payload>) => void
 }
 
-export interface TCustomEvent<
+export type TCustomEvent<
   Names extends NamesType,
-  Detail extends DetailType,
-> extends TypedEvent<Names, Detail> {}
+  Payload extends PayloadType,
+> = TypedEvent<Names, Payload>
 
 type TEventListenerOrTEventListenerObject<
   Names extends NamesType,
-  Detail extends DetailType,
-> = TEventListener<Names, Detail> | TEventListenerObject<Names, Detail>
+  Payload extends PayloadType,
+> = TEventListener<Names, Payload> | TEventListenerObject<Names, Payload>
 
 export interface EventTargetable<
   Names extends NamesType = never,
-  Detail extends DetailType = Record<never, never>,
+  Payload extends PayloadType = Record<never, never>,
 > {
-  readonly target: TEventTarget<Names, Detail>
+  readonly target: TEventTarget<Names, Payload>
 }
 
 export interface TEventTarget<
   Names extends NamesType,
-  Detail extends DetailType = Record<never, never>,
-> extends TypedEventTarget<Record<Names, Detail>> {}
+  Payload extends PayloadType = Record<never, never>,
+> extends TypedEventTarget<Record<Names, Payload>> {}
 
 export class TEventTarget<
   Names extends NamesType,
-  Detail extends DetailType = Record<never, never>,
-> extends TypedEventTarget<Record<Names, Detail>> {
-  override dispatch(type: Names, detail: Detail): boolean {
-    return super.dispatch(type as Extract<Names, string>, detail)
+  Payload extends PayloadType = Record<never, never>,
+> extends TypedEventTarget<Record<Names, Payload>> {
+  override dispatch(type: Names, payload: Payload): boolean {
+    return super.dispatch(type as Extract<Names, string>, payload)
   }
+}
+
+export function asTypedEventTarget<TRecord extends EventPayloadMap>(target: unknown): TypedEventTarget<TRecord> {
+  return target as TypedEventTarget<TRecord>
+}
+
+/**
+ * @example
+ * ```ts
+ * const node = asWithTypedEventTarget<{
+ *   click:  {
+ *     detail: {
+ *       x: number;
+ *       y: number
+ *     }
+ *   }
+ * }>(document.createElement("div"))
+ * node.addEventListener("click", (event) => {
+ *  console.log(`Clicked at (${event.detail.x}, ${event.detail.y})`)
+ * })
+ * ```
+ */
+export function asWithTypedEventTarget<
+  TRecord extends EventPayloadMap,
+  const TTarget = unknown
+> (target: TTarget): TTarget & TypedEventTarget<TRecord> {
+  return target as TTarget & TypedEventTarget<TRecord>
 }

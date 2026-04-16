@@ -1,6 +1,23 @@
 import { expect, test } from "bun:test"
 import { TEventTarget, TypedEventTarget } from "./index"
 
+test("flattens object payload onto the event", () => {
+  const target = TypedEventTarget.fromRecord<{
+    click: { x: number; y: number }
+  }>()
+
+  let seen: { x: number; y: number } | undefined
+
+  target.addEventListener("click", ({ x, y, type }) => {
+    seen = { x, y }
+    expect(type).toBe("click")
+  })
+
+  target.dispatch("click", { x: 10, y: 20 })
+
+  expect(seen).toEqual({ x: 10, y: 20 })
+})
+
 test("dispatches a typed event to listeners", () => {
   const target = TypedEventTarget.fromRecord<{
     click: { x: number; y: number }
@@ -10,7 +27,7 @@ test("dispatches a typed event to listeners", () => {
   const received: Array<{ x: number; y: number }> = []
 
   target.addEventListener("click", (event) => {
-    received.push(event.detail)
+    received.push({ x: event.x, y: event.y })
   })
 
   const result = target.dispatch("click", { x: 10, y: 20 })
@@ -58,7 +75,7 @@ test("legacy TEventTarget wrapper still dispatches", () => {
 
   let seen = ""
   target.addEventListener("saved", (event) => {
-    seen = event.detail.id
+    seen = event.id
   })
 
   target.dispatch("saved", { id: "42" })
