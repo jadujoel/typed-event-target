@@ -1,0 +1,14 @@
+{
+  "name": "@jadujoel/typed-event-target",
+  "module": "src/index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/web": "0.0.345"
+  },
+  "peerDependencies": {
+    "typescript": "^6"
+  },
+  "dependencies": {
+  }
+}
