@@ -1,24 +1,24 @@
 # typed-event-target
 
-Tiny TypeScript helpers for strongly typed event emitters and DOM-style event targets.
+Tiny TypeScript helpers for strongly typed event targets.
 
-## Why this library exists
+## Why this exists
 
-The standard `EventTarget` API is great at runtime, but it gives very little type safety in TypeScript for:
+The standard DOM event API works well at runtime, but TypeScript usually cannot enforce:
 
-- allowed event names
-- event payload shape
-- listener argument types
+- which event names are allowed
+- which payload fields belong to each event
+- which listener argument shape you receive
 
-This library keeps the familiar `addEventListener`, `removeEventListener`, and `dispatchEvent` workflow while making event names and payloads fully typed.
+This package keeps the familiar event-target style API while making those parts strongly typed.
 
-## What you get
+## Features
 
-- strongly typed event names
-- strongly typed event payloads
-- a small custom event bus with a DOM-like API
-- helpers for attaching typing to existing objects or DOM nodes
+- typed event names
+- typed payload objects
+- familiar `addEventListener`, `removeEventListener`, and `dispatchEvent` style usage
 - support for `{ once: true }` listeners
+- helpers for casting existing objects or DOM nodes to typed targets
 
 ## Install
 
@@ -26,7 +26,7 @@ This library keeps the familiar `addEventListener`, `removeEventListener`, and `
 bun add @jadujoel/typed-event-target
 ```
 
-You can also use your preferred package manager:
+Other package managers also work:
 
 ```bash
 npm install @jadujoel/typed-event-target
@@ -34,9 +34,9 @@ pnpm add @jadujoel/typed-event-target
 yarn add @jadujoel/typed-event-target
 ```
 
-## Basic usage
+## Quick start
 
-Create a typed event target by defining an event map where each key is an event name and each value is that event's payload.
+Define an event map where each key is the event name and each value is the payload object for that event.
 
 ```ts
 import { TypedEventTarget } from "@jadujoel/typed-event-target"
@@ -47,35 +47,33 @@ type AppEvents = {
   error: { reason: string }
 }
 
-const events = TypedEventTarget.fromRecord<AppEvents>()
+const target = TypedEventTarget.from<AppEvents>()
 
-events.addEventListener("message", (event) => {
-  console.log(event.type)   // "message"
-  console.log(event.text)   // string
-  console.log(event.from)   // string
+target.addEventListener("message", (event) => {
+  console.log(event.type)
+  console.log(event.text)
+  console.log(event.from)
 })
 
-events.dispatch("message", {
+target.dispatch("message", {
   text: "Hello",
   from: "system",
 })
 ```
 
-## How it works
-
-When you call `dispatch`, the payload is merged onto the event object.
+When you call `dispatch`, the payload is merged onto a plain event object with a `type` field.
 
 ```ts
-events.dispatch("ready", { startedAt: Date.now() })
+target.dispatch("ready", { startedAt: Date.now() })
 ```
 
-The listener receives an object shaped like:
+The listener receives data shaped like this:
 
 ```ts
 { type: "ready", startedAt: 1710000000000 }
 ```
 
-## Using once listeners
+## Once listeners
 
 ```ts
 const target = TypedEventTarget.fromRecord<{
@@ -87,13 +85,13 @@ target.addEventListener("connected", (event) => {
 }, { once: true })
 
 target.dispatch("connected", { userId: "u_1" })
-target.dispatch("connected", { userId: "u_1" }) // listener will not run again
+target.dispatch("connected", { userId: "u_1" })
 ```
 
 ## Removing listeners
 
 ```ts
-const target = TypedEventTarget.fromRecord<{
+const target = TypedEventTarget.from<{
   change: { value: number }
 }>()
 
@@ -105,30 +103,12 @@ target.addEventListener("change", onChange)
 target.removeEventListener("change", onChange)
 ```
 
-## Typing an existing DOM element or object
+## Dispatching a full event object
 
-If you already have a target-like object and want typed listeners, you can cast it with `asWithTypedEventTarget`.
-
-```ts
-import { asWithTypedEventTarget } from "@jadujoel/typed-event-target"
-
-const button = asWithTypedEventTarget<{
-  click: { clientX: number; clientY: number }
-}>(document.createElement("button"))
-
-button.addEventListener("click", (event) => {
-  console.log(event.clientX, event.clientY)
-})
-```
-
-This is especially useful when working with browser elements, custom elements, or framework-owned objects that already behave like event targets.
-
-## Dispatching full event objects
-
-If you already have a complete event object, you can dispatch it directly.
+If you already have the complete event object, you can pass it directly.
 
 ```ts
-const target = TypedEventTarget.fromRecord<{
+const target = TypedEventTarget.from<{
   saved: { id: string }
 }>()
 
@@ -138,13 +118,45 @@ target.dispatchEvent({
 })
 ```
 
+## Typing an existing target or DOM node
+
+Use the casting helpers when the runtime object already behaves like an event target and you want better TypeScript support.
+
+```ts
+import { asTypedEventTarget, asWithTypedEventTarget } from "@jadujoel/typed-event-target"
+
+const button = document.createElement("button")
+
+const typedButton = asTypedEventTarget<{
+  click: { clientX: number; clientY: number }
+}>(button)
+
+typedButton.addEventListener("click", (event) => {
+  console.log(event.clientX, event.clientY)
+})
+
+const sameButton = asWithTypedEventTarget<{
+  click: { clientX: number; clientY: number }
+}>(button)
+
+sameButton.addEventListener("click", (event) => {
+  console.log(event.clientX, event.clientY)
+})
+```
+
+> These helpers are type-level casts. They do not add runtime event behavior to plain objects.
+
 ## API overview
 
-### `TypedEventTarget<TRecord>`
+### Main class
 
-Main class for creating typed event targets.
+- `TypedEventTarget<TRecord>`
+- `new TypedEventTarget()`
+- `TypedEventTarget.default<TRecord>()`
+- `TypedEventTarget.from<TRecord>()`
+- `TypedEventTarget.fromRecord<TRecord>()`
 
-Common methods:
+### Instance methods
 
 - `addEventListener(type, listener, options?)`
 - `removeEventListener(type, listener)`
@@ -153,34 +165,37 @@ Common methods:
 - `hasListeners(type)`
 - `dispose()`
 
-### `TypedEventTarget.fromRecord<TRecord>()`
+### Helper functions
 
-Convenience factory for creating a typed instance.
+- `asTypedEventTarget<TRecord>(target)`
+- `asWithTypedEventTarget<TRecord>(target)`
 
-### `asTypedEventTarget<TRecord>(target)`
+### Exported types
 
-Casts an existing object to a typed event target.
+- `TypedEvent`
+- `TypedEventListener`
+- `TypedEventListenerObject`
+- `EventFor`
+- `EventPayloadMap`
 
-### `asWithTypedEventTarget<TRecord>(target)`
+## When to use it
 
-Returns the original object with typed event-target behavior attached at the type level.
+This package is a good fit when you want:
 
-### `TEventTarget`
-
-Legacy wrapper maintained for the simpler “one payload type for all event names” style.
-
-## When to use this library
-
-Use it when you want:
-
-- lightweight typed eventing without bringing in a larger state library
-- safer event-driven code in TypeScript
+- lightweight typed eventing
 - autocomplete for event names and payload fields
-- DOM-style APIs for app-internal events
+- a small event utility without a larger framework dependency
+- DOM-style patterns for internal app events
 
 ## Development
 
-Run the example locally:
+Install dependencies:
+
+```bash
+bun install
+```
+
+Run the example:
 
 ```bash
 bun example.ts
@@ -190,4 +205,10 @@ Run tests:
 
 ```bash
 bun test
+```
+
+Build the package:
+
+```bash
+bun run build
 ```

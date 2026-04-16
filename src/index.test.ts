@@ -57,6 +57,24 @@ test("supports once listeners", () => {
   expect(count).toBe(1)
 })
 
+test("supports fromRecord in an end-to-end flow", () => {
+  const target = TypedEventTarget.fromRecord<{
+    saved: { id: string; ok: boolean }
+  }>()
+
+  let seen: { type: string; id: string; ok: boolean } | undefined
+
+  target.addEventListener("saved", (event) => {
+    seen = { type: event.type, id: event.id, ok: event.ok }
+  })
+
+  const result = target.dispatch("saved", { id: "42", ok: true })
+
+  expect(result).toBe(true)
+  expect(target.hasListeners("saved")).toBe(true)
+  expect(seen).toEqual({ type: "saved", id: "42", ok: true })
+})
+
 test("removes a listener cleanly", () => {
   const target = TypedEventTarget.from<{
     change: { value: number }
