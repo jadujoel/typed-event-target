@@ -112,7 +112,7 @@ const target = TypedEventTarget.from<{
   saved: { id: string }
 }>()
 
-target.dispatchEvent({
+target.emit({
   type: "saved",
   id: "42",
 })
@@ -160,6 +160,7 @@ sameButton.addEventListener("click", (event) => {
 - `addEventListener(type, listener, options?)`
 - `removeEventListener(type, listener)`
 - `dispatch(type, payload)`
+- `emit(event)` or `emit(type, payload)`
 - `dispatchEvent(event)`
 - `hasListeners(type)`
 - `dispose()`

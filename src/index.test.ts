@@ -40,6 +40,23 @@ test("dispatches a typed event to listeners", () => {
   expect(received).toEqual([{ x: 10, y: 20 }])
 })
 
+test("emits an already-typed event object", () => {
+  const target = TypedEventTarget.from<{
+    click: { x: number; y: number }
+  }>()
+
+  const received: Array<{ type: string; x: number; y: number }> = []
+
+  target.addEventListener("click", (event) => {
+    received.push({ type: event.type, x: event.x, y: event.y })
+  })
+
+  const result = target.emit({ type: "click", x: 1, y: 2 })
+
+  expect(result).toBe(true)
+  expect(received).toEqual([{ type: "click", x: 1, y: 2 }])
+})
+
 test("supports once listeners", () => {
   const target = TypedEventTarget.from<{
     ready: { ok: boolean }

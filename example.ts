@@ -3,8 +3,17 @@ import { TypedEventTarget, asTypedEventTarget, asWithTypedEventTarget } from "./
 import { Window } from "happy-dom"
 
 const target = TypedEventTarget.from<{
-  click: { x: number; y: number }
+  click: { x: number; y: number },
+  clock: { time: Date },
 }>()
+
+target.emit({
+  type: "click",
+  x: 10,
+  y: 20,
+})
+
+target.emit("clock", { time: new Date() })
 
 const target2 = new TypedEventTarget<{
   click: { x: 0; y: 1 },

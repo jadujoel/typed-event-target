@@ -151,6 +151,19 @@ export class TypedEventTarget<
     return this.dispatchEvent({ type, ...payload })
   }
 
+  emit<TType extends EventName<TRecord>>(event: DispatchableEvent<TType, TRecord[TType]>): boolean
+  emit<TType extends EventName<TRecord>>(type: TType, payload: TRecord[TType]): boolean
+  emit<TType extends EventName<TRecord>>(
+    typeOrEvent: TType | DispatchableEvent<TType, TRecord[TType]>,
+    payload?: TRecord[TType],
+  ): boolean {
+    if (typeof typeOrEvent === "string") {
+      return this.dispatch(typeOrEvent, payload as TRecord[TType])
+    }
+
+    return this.dispatchEvent(typeOrEvent)
+  }
+
   hasListeners<TType extends EventName<TRecord>>(type: TType): boolean {
     return (this.map.get(type)?.length ?? 0) > 0
   }
