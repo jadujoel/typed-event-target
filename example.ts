@@ -1,8 +1,8 @@
 
-import { TypedEventTarget, asTypedEventTarget } from "./src/index.ts"
-import { Document } from "happy-dom"
+import { TypedEventTarget, asTypedEventTarget, asWithTypedEventTarget } from "./src/index.ts"
+import { Window } from "happy-dom"
 
-const target = TypedEventTarget.fromRecord<{
+const target = TypedEventTarget.from<{
   click: { x: number; y: number }
 }>()
 
@@ -19,29 +19,28 @@ target.addEventListener("click", (event) => {
   console.log(`Clicked at (${event.x}, ${event.y})`)
 })
 
-
 target.dispatch("click", { x: 10, y: 20 })
 target2.dispatch("keydown", { key: "Enter" })
 
-
-function dom() {
-  const document = new Document()
-  const node = document.createElement("div")
-  const target = asTypedEventTarget<{
-    click:  {
-      detail: {
-        x: number;
-        y: number
-      }
+const window = new Window()
+const button = window.document.createElement("button")
+const node = asTypedEventTarget<{
+  click: { clientX: number; clientY: number },
+  clack: {
+    detail: {
+      x: number
+      y: number
     }
-  }>(node)
+  }
+}>(button)
 
-  target.addEventListener("click", (event) => {
-    console.log(`Clicked at (${event.detail.x}, ${event.detail.y})`)
-  })
+node.addEventListener("click", (event) => {
+  console.log(`Click at (${event.clientX}, ${event.clientY})`)
+})
 
-  node.click()
-  // target.dispatch("click", { detail: { x: 10, y: 20 } })
-}
+node.addEventListener("clack", (event) => {
+  console.log(`Clack at (${event.detail.x}, ${event.detail.y})`)
+})
 
-dom()
+button.dispatchEvent(new window.MouseEvent("click", { clientX: 30, clientY: 40 }))
+button.dispatchEvent(new window.CustomEvent("clack", { detail: { x: 50, y: 60 } }))

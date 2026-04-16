@@ -1,8 +1,12 @@
 import { expect, test } from "bun:test"
-import { TEventTarget, TypedEventTarget } from "./index"
+import { Window } from "happy-dom"
+import DefaultTypedEventTarget, {
+  TypedEventTarget,
+  asWithTypedEventTarget,
+} from "./index"
 
 test("flattens object payload onto the event", () => {
-  const target = TypedEventTarget.fromRecord<{
+  const target = TypedEventTarget.from<{
     click: { x: number; y: number }
   }>()
 
@@ -19,7 +23,7 @@ test("flattens object payload onto the event", () => {
 })
 
 test("dispatches a typed event to listeners", () => {
-  const target = TypedEventTarget.fromRecord<{
+  const target = TypedEventTarget.from<{
     click: { x: number; y: number }
     keydown: { key: string }
   }>()
@@ -37,7 +41,7 @@ test("dispatches a typed event to listeners", () => {
 })
 
 test("supports once listeners", () => {
-  const target = TypedEventTarget.fromRecord<{
+  const target = TypedEventTarget.from<{
     ready: { ok: boolean }
   }>()
 
@@ -54,7 +58,7 @@ test("supports once listeners", () => {
 })
 
 test("removes a listener cleanly", () => {
-  const target = TypedEventTarget.fromRecord<{
+  const target = TypedEventTarget.from<{
     change: { value: number }
   }>()
 
@@ -70,15 +74,37 @@ test("removes a listener cleanly", () => {
   expect(count).toBe(0)
 })
 
-test("legacy TEventTarget wrapper still dispatches", () => {
-  const target = new TEventTarget<"saved", { id: string }>()
+test("works with happy-dom elements", () => {
+  const window = new Window()
+  const node = asWithTypedEventTarget<{
+    click: { clientX: number; clientY: number }
+  }>(window.document.createElement("button"))
 
-  let seen = ""
-  target.addEventListener("saved", (event) => {
-    seen = event.id
+  let seen: { type: string; clientX: number; clientY: number } | undefined
+
+  node.addEventListener("click", ({ type, clientX, clientY }) => {
+    seen = { type, clientX, clientY }
   })
 
-  target.dispatch("saved", { id: "42" })
+  // @ts-expect-error - dispatchEvent is not typed to know about mouse event
+  node.dispatchEvent(new window.MouseEvent("click", { clientX: 30, clientY: 40 }))
 
-  expect(seen).toBe("42")
+  expect(seen).toEqual({ type: "click", clientX: 30, clientY: 40 })
+})
+
+test("exports user-facing constructors and aliases", () => {
+  expect(DefaultTypedEventTarget).toBe(TypedEventTarget)
+
+  const target = TypedEventTarget.default<{
+    ready: { ok: boolean }
+  }>()
+
+  let seen = false
+  target.addEventListener("ready", (event) => {
+    seen = event.ok
+  })
+
+  target.dispatch("ready", { ok: true })
+
+  expect(seen).toBe(true)
 })
