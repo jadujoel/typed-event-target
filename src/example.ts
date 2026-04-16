@@ -1,5 +1,5 @@
 
-import { TypedEventTarget, asTypedEventTarget, asWithTypedEventTarget } from "./src/index.ts"
+import { TypedEventTarget, asTypedEventTarget, asWithTypedEventTarget } from "./index.ts"
 import { Window } from "happy-dom"
 
 const target = TypedEventTarget.from<{
